@@ -6,7 +6,7 @@ from imutils.perspective import four_point_transform
 from imutils import contours
 import imutils
 import cv2
-
+import numpy as np
 # define the dictionary of digit segments so we can identify
 # each digit on the thermostat
 DIGITS_LOOKUP = {
@@ -23,7 +23,7 @@ DIGITS_LOOKUP = {
 }
 
 # load the example image
-image = cv2.imread("w.jpeg")
+image = cv2.imread("h.jpeg")
 
 # pre-process the image by resizing it, converting it to
 # graycale, blurring it, and computing an edge map
@@ -31,7 +31,8 @@ image = imutils.resize(image, height=500)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 edged = cv2.Canny(blurred, 50, 200, 255)
-
+cv2.imshow("a",edged)
+cv2.waitKey(0)
 # find contours in the edge map, then sort them by their
 # size in descending order
 cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL,
@@ -56,23 +57,33 @@ for c in cnts:
 # to it
 warped = four_point_transform(gray, displayCnt.reshape(4, 2))
 output = four_point_transform(image, displayCnt.reshape(4, 2))
+cv2.imshow("w",warped)
 
 # threshold the warped image, then apply a series of morphological
 # operations to cleanup the thresholded image
-thresh = cv2.threshold(warped, 0, 255,
+blurred1 = cv2.GaussianBlur(warped, (5, 5), 3)
+
+thresh = cv2.threshold(blurred1, 0, 255,
 	cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+thresh=cv2.adaptiveThreshold(warped,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,51,1)
 
-
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 5))
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,4))
 thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-cv2.imshow('output',output)
-cv2.imshow('thresh',thresh)
+kernel=np.ones((2,2),np.uint8)
+thresh=cv2.dilate(thresh,kernel,iterations=4)
+print(thresh.shape)
+cv2.imshow("t",thresh)
 cv2.waitKey(0)
 # find contours in the thresholded image, then initialize the
 # digit contours lists
 cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 	cv2.CHAIN_APPROX_SIMPLE)
+
+
 cnts = imutils.grab_contours(cnts)
+cv2.drawContours(output,cnts,-1,(0,255,0),3)
+cv2.imshow('cnt',output)
+cv2.waitKey(0)
 digitCnts = []
 
 # loop over the digit area candidates
@@ -81,17 +92,19 @@ for c in cnts:
 	(x, y, w, h) = cv2.boundingRect(c)
 
 	# if the contour is sufficiently large, it must be a digit
-	if w >= 15 and (h >= 30 and h <= 40):
+#	if (w >= 5 and w<=50) and (h >= 30 and h <= 150):
+	if w >= 10 and (h >= 10 and h <= 120):
+	#if w >= 15 and (h >= 30 and h <= 40):
+	
 		digitCnts.append(c)
-
-cv2.drawContours(output,digitCnts,-1,(0,255,0),3)
+cv2.drawContours(output,digitCnts,-1,(0,0,255),3)
 cv2.imshow('output',output)
 cv2.waitKey(0)
 
-
-# sort the contours from left-to-right, then initialize the
+#print(digitCnts)
+# sort the contours from left-to-right, then initialize then
 # actual digits themselves
-digitCnts = contours.sort_contours(digitCnts,method="left-to-right")[0]
+digitCnts,_ = contours.sort_contours(digitCnts,method="left-to-right")
 digits = []
 
 # loop over each of the digits
@@ -136,11 +149,14 @@ for c in digitCnts:
 	digit = DIGITS_LOOKUP[tuple(on)]
 	digits.append(digit)
 	cv2.rectangle(output, (x, y), (x + w, y + h), (0, 255, 0), 1)
-	cv2.putText(output, str(digit), (x - 10, y - 10),
+	
+	cv2.imshow("Output", output)
+	cv2.waitKey(0)
+	cv2.putText(output, str(digit), (x - 5, y - 5),
 		cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
 # display the digits
-#print(u"{}{}.{} \u00b0C".format(*digits))
+print(u"{}{}{}{}{}{}{} kW".format(*digits))
 cv2.imshow("Input", image)
 cv2.imshow("Output", output)
 cv2.waitKey(0)
